@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Générateur d'infographie – Fiche de paie La Poste</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --bleu:#123c78;--orange:#e8730c;--vert:#159a4b;--hs:#1c73c9;--rouge:#cf2222;
+    --cgt:#e2001a;--ink:#141b2e;--muted:#6a7488;--line:#e7eaf1;
+    --sh:0 6px 20px rgba(20,27,46,.08);--sh-sm:0 4px 12px rgba(20,27,46,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:#eef0f4;color:var(--ink);padding:28px 16px 80px}
+  .wrap{max-width:940px;margin:0 auto}
+  .apphead{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+  .apphead .l{width:62px;height:60px;background:var(--logo) left center/contain no-repeat}
+  .apphead h1{font-size:26px;font-weight:900}
+  .apphead p{font-size:15px;color:var(--muted);font-weight:600;margin-top:2px}
+
+  .panel{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh-sm);padding:22px;margin-bottom:20px}
+  .panel h2{font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:14px}
+
+  .drop{display:block;border:2px dashed #c7cede;border-radius:14px;padding:34px;text-align:center;cursor:pointer;transition:.15s;background:#fafbfe}
+  .drop.hot{border-color:var(--cgt);background:#fff5f5}
+  .drop b{font-size:17px;font-weight:800} .drop small{display:block;color:var(--muted);margin-top:6px;font-size:13px}
+  .drop input{display:none}
+  .status{margin-top:12px;font-size:14px;font-weight:700}
+  .status.err{color:var(--rouge)} .status.ok{color:var(--vert)}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 16px}
+  .fld{display:flex;flex-direction:column;gap:5px}
+  .fld label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  .fld input{border:1px solid #d7dce7;border-radius:9px;padding:9px 11px;font-size:15px;font-weight:600;font-family:inherit}
+  .fld input:focus{outline:2px solid var(--cgt);border-color:var(--cgt)}
+  .fld.num input{font-variant-numeric:tabular-nums;text-align:right}
+
+  .varhead{display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px}
+  .varhead h3{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:var(--orange)}
+  .btn-sm{border:1px solid var(--orange);color:var(--orange);background:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:800;cursor:pointer}
+  .varrow{display:grid;grid-template-columns:1fr 140px 40px;gap:10px;align-items:center;margin-bottom:8px}
+  .varrow input{border:1px solid #d7dce7;border-radius:9px;padding:8px 10px;font-size:14px;font-weight:600;font-family:inherit;width:100%}
+  .varrow .del{border:none;background:#f4e2e2;color:var(--rouge);border-radius:8px;height:36px;font-size:18px;font-weight:900;cursor:pointer}
+  .derived{display:flex;gap:22px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+  .derived .d{font-size:14px;font-weight:700;color:var(--muted)}
+  .derived .d b{display:block;font-size:24px;font-weight:900;color:var(--ink);font-variant-numeric:tabular-nums}
+  .warn{color:var(--rouge)!important}
+
+  .actions{display:flex;gap:12px;flex-wrap:wrap}
+  .btn{border:none;border-radius:11px;padding:14px 22px;font-size:16px;font-weight:900;cursor:pointer}
+  .btn.primary{background:var(--cgt);color:#fff}
+  .btn.ghost{background:#fff;border:1px solid #d7dce7;color:var(--ink)}
+  .hidden{display:none!important}
+
+  .previewwrap{overflow:hidden;border-radius:16px;border:1px solid var(--line);background:#c9ccd6;display:flex;justify-content:center;padding:18px}
+  .scaler{transform-origin:top center}
+
+  /* ---------- INFOGRAPHIE (identique au visuel validé) ---------- */
+  .stage{width:1080px;height:1920px;background:#fff;overflow:hidden;
+         display:flex;flex-direction:column;padding:34px 36px 28px}
+  .stage>*{flex:0 0 auto;margin-bottom:13px}
+  .stage>*:last-child{margin-bottom:0}
+  .tnum{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .ig-head{display:flex;align-items:center}
+  .ig-logo{flex:0 0 auto;height:126px;width:auto;margin-right:24px}
+  .ig-head h1{font-size:44px;font-weight:900;letter-spacing:-.02em;line-height:1.02}
+  .ig-head p{font-size:25px;color:var(--muted);font-weight:600;margin-top:6px}
+  .ident{background:#f7f8fb;border:1px solid var(--line);border-radius:18px;padding:16px 22px 4px;display:flex;flex-wrap:wrap}
+  .ident>div{flex:0 0 25%;box-sizing:border-box;padding-right:16px;margin-bottom:12px}
+  .ident .k{font-size:15px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  .ident .v{font-size:22px;font-weight:800;line-height:1.08;margin-top:2px}
+  .hero{border-radius:22px;padding:22px 28px;color:#fff;box-shadow:var(--sh);overflow:hidden}
+  .hero .row{display:flex;align-items:center}
+  .ic{flex:0 0 auto;width:58px;height:58px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.16);margin-right:18px}
+  .ic svg{width:32px;height:32px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+  .hero .lab{font-size:24px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;opacity:.92}
+  .hero .sub{font-size:20px;font-weight:600;opacity:.85;margin-top:2px}
+  .amount{display:flex;align-items:baseline;margin-top:8px}
+  .amount .big{font-size:98px;font-weight:900;line-height:.9}
+  .amount .cur{font-size:46px;font-weight:800;margin-left:12px} .amount .net{font-size:26px;font-weight:800;opacity:.9;margin-left:12px}
+  .hero .desc{font-size:20px;font-weight:600;opacity:.9;margin-top:8px;line-height:1.25}
+  .pill{display:inline-flex;background:rgba(255,255,255,.2);padding:7px 16px;border-radius:999px;font-size:24px;font-weight:900;margin-top:9px}
+  .b-base{background:linear-gradient(135deg,#164488,#0f3164)}
+  .b-var{background:linear-gradient(135deg,#ef7d19,#d9660a)}
+  .b-net{background:linear-gradient(135deg,#18a552,#127f40)}
+  .b-net .amount .big{font-size:108px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh-sm);padding:20px 26px}
+  .card h3{display:flex;align-items:center;font-size:24px;font-weight:900;margin-bottom:12px}
+  .card h3 .dot{margin-right:12px}
+  .dot{width:14px;height:14px;border-radius:4px;display:inline-block}
+  .bar{display:flex;align-items:center;margin:9px 0}
+  .bar .nm{flex:0 0 220px;font-size:21px;font-weight:700}
+  .bar .track{flex:1;margin:0 14px}
+  .track{height:22px;border-radius:999px;background:#f0f2f7;overflow:hidden}
+  .fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#f2871f,#e8730c)}
+  .bar .val{flex:0 0 110px;font-size:24px;font-weight:900;color:var(--orange);text-align:right}
+  .total-strip{display:flex;justify-content:space-between;align-items:center;margin-top:13px;padding-top:13px;border-top:2px dashed var(--line)}
+  .total-strip .t1{font-size:22px;font-weight:800} .total-strip .t2{font-size:30px;font-weight:900;color:var(--orange)}
+  .duo{display:flex}
+  .duo>.mini{flex:1}
+  .duo>.mini:first-child{margin-right:18px}
+  .mini{border-radius:20px;padding:20px 24px;box-shadow:var(--sh-sm)}
+  .mini h4{display:flex;align-items:center;font-size:22px;font-weight:900;margin-bottom:12px}
+  .mini h4 svg{margin-right:10px;flex:0 0 auto}
+  .mini .line{display:flex;justify-content:space-between;align-items:baseline;margin:7px 0}
+  .mini .ln-k{font-size:19px;font-weight:600} .mini .ln-v{font-size:24px;font-weight:900;letter-spacing:-.02em}
+  .m-hs{background:#e8f1fc} .m-hs h4{color:var(--hs)} .m-hs .ln-k{color:#33506e} .m-hs .ln-v{color:var(--hs)}
+  .m-cot{background:#fbeaea} .m-cot h4{color:var(--rouge)} .m-cot .ln-k{color:#7a4141} .m-cot .ln-v{color:var(--rouge)}
+  .m-cot .big-cot{font-size:50px;font-weight:900;color:var(--rouge);letter-spacing:-.03em;line-height:1}
+  .m-cot .big-cot small{font-size:24px}
+  .tags{display:flex;flex-wrap:wrap;margin-top:11px}
+  .tag{background:#fff;border:1px solid #f0d3d3;color:var(--rouge);font-size:16px;font-weight:800;padding:5px 12px;border-radius:999px;margin:0 8px 8px 0}
+  .ig-note{font-size:16px;font-weight:700;color:#33506e;margin-top:9px;opacity:.85}
+  .resume{background:#0f1830;border-radius:22px;padding:22px 30px;color:#fff;box-shadow:var(--sh)}
+  .resume .cap{font-size:20px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;opacity:.7;margin-bottom:12px}
+  .eq{display:flex;align-items:center;justify-content:center}
+  .eq>*{margin:0 10px}
+  .eq .term{display:flex;flex-direction:column;align-items:center}
+  .eq .term .n{font-size:50px;font-weight:900;letter-spacing:-.03em}
+  .eq .term .l{font-size:17px;font-weight:700;opacity:.7;margin-top:3px;text-transform:uppercase;letter-spacing:.04em}
+  .eq .op{font-size:44px;font-weight:800;opacity:.55}
+  .eq .term.res .n{color:#4fe08a}
+  .resume .foot{text-align:center;font-size:22px;font-weight:700;margin-top:14px;opacity:.9}
+  .resume .foot b{color:#ffb24d}
+  :root{--logo:url('logo.png')}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="apphead">
+    <div class="l"></div>
+    <div><h1>Générateur d'infographie – Fiche de paie</h1><p>Dépose un bulletin, vérifie les montants, génère l'image à partager.</p></div>
+  </div>
+
+  <!-- 1. UPLOAD -->
+  <div class="panel">
+    <h2>1 · Bulletin de paie (PDF)</h2>
+    <label class="drop" id="drop">
+      <b>Dépose ton bulletin ici, ou clique pour choisir</b>
+      <small>PDF avec texte (pas une photo scannée). Le fichier reste dans ton navigateur, rien n'est envoyé.</small>
+      <input type="file" id="file" accept="application/pdf">
+    </label>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- 2. REVIEW -->
+  <div class="panel hidden" id="reviewPanel">
+    <h2>2 · Vérifie et corrige les montants</h2>
+    <div class="grid">
+      <div class="fld"><label>Mois</label><input id="f_mois"></div>
+      <div class="fld"><label>Fonction</label><input id="f_fonction"></div>
+      <div class="fld"><label>Grade</label><input id="f_grade"></div>
+      <div class="fld"><label>Ancienneté</label><input id="f_anc"></div>
+      <div class="fld"><label>Classe / Niveau</label><input id="f_classe"></div>
+      <div class="fld"><label>Coefficient</label><input id="f_coeff"></div>
+      <div class="fld"><label>Affectation</label><input id="f_affect"></div>
+      <div class="fld"><label>Heures rémunérées</label><input id="f_heures"></div>
+      <div class="fld num"><label>Salaire net versé (€)</label><input id="f_net" type="number" step="0.01"></div>
+      <div class="fld num"><label>Cotisations salariales (€)</label><input id="f_cotis" type="number" step="0.01"></div>
+    </div>
+
+    <div class="varhead"><h3>Éléments de la part variable (montants nets)</h3><button class="btn-sm" id="addVar">+ Ligne</button></div>
+    <div id="varList"></div>
+
+    <div class="grid" style="margin-top:14px">
+      <div class="fld num"><label>Heures sup — nombre (h)</label><input id="f_hsh" type="number" step="0.01"></div>
+      <div class="fld num"><label>Heures sup — net exonéré (€)</label><input id="f_hsnet" type="number" step="0.01"></div>
+      <div class="fld num"><label>Heures sup — cumul annuel (€)</label><input id="f_hscum" type="number" step="0.01"></div>
+    </div>
+
+    <div class="derived">
+      <div class="d">Net de base (calculé)<b id="d_base">—</b></div>
+      <div class="d">Total variable<b id="d_var">—</b></div>
+      <div class="d">Part variable<b id="d_pct">—</b></div>
+      <div class="d" id="d_check_wrap">Cohérence<b id="d_check">—</b></div>
+    </div>
+
+    <div class="actions" style="margin-top:18px">
+      <button class="btn primary" id="genBtn">Générer l'infographie</button>
+    </div>
+  </div>
+
+  <!-- 3. PREVIEW -->
+  <div class="panel hidden" id="outPanel">
+    <h2>3 · Aperçu et export</h2>
+    <div class="actions" style="margin-bottom:16px">
+      <button class="btn primary" id="dlBtn">Télécharger l'image (PNG)</button>
+      <button class="btn ghost" id="reGen">Modifier les montants</button>
+    </div>
+    <div class="previewwrap">
+      <div class="scaler" id="scaler">
+        <div class="stage" id="stage"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const LOGO_URL="logo.png";
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+/* ============ helpers numériques ============ */
+function toNum(s){ if(s==null) return NaN; return parseFloat(String(s).replace(/[\s\u00a0\u202f]/g,'').replace(',','.')); }
+function eur(n){ return (Math.round(n)).toLocaleString('fr-FR') + ' €'; }
+// montants à 2 décimales (ex: 2148,36 / 329,37) — exclut les taux à 3 décimales (20,585)
+// Format La Poste : pas d'espace de milliers dans les montants, on matche donc un token strict.
+function amounts2(line){
+  const m = String(line).match(/(?<!\d)\d+,\d{2}(?!\d)/g) || [];
+  return m.map(toNum).filter(n=>!isNaN(n));
+}
+
+/* ============ extraction texte PDF en LIGNES (regroupées par Y) ============ */
+async function extractRows(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const rows = [];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const buckets = [];
+    tc.items.forEach(it=>{
+      if(!it.str || !it.str.trim()) return;
+      const y = it.transform[5], x = it.transform[4];
+      let b = buckets.find(bb=>Math.abs(bb.y-y)<=3);
+      if(!b){ b={y, items:[]}; buckets.push(b); }
+      b.items.push({x, s:it.str});
+    });
+    buckets.sort((a,b)=>b.y-a.y);
+    buckets.forEach(b=>{
+      const line = b.items.sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim();
+      if(line) rows.push(line);
+    });
+  }
+  return rows;
+}
+
+/* ============ classification des rubriques ============ */
+// rubriques VARIABLES : label affiché + regex de détection
+const VAR_RULES = [
+  {re:/HS\s*MAJOREES|HEURES?\s*SUP(?!.*NET)/i, cat:'hs',     label:'Heures supplémentaires'},
+  {re:/PART\s*VARIABLE|(?<!IND[.\s])PRIME/i,   cat:'prime',  label:'Prime part variable'},
+  {re:/CONGES?\s*PAYES/i,                       cat:'cp',     label:'Congés payés'},
+  {re:/TRAVAIL\s*DE\s*NUIT|SURMAJO/i,           cat:'nuit',   label:'Travail de nuit'},
+  {re:/IND[.\s]*REMPLACEMENT|INDEMNIT|IND[.\s]/i,cat:'indemn',label:'Indemnités'},
+];
+// rubriques FIXES
+const FIXE_RE = /^(SALAIRE(?!\s*(RETENU|MAINTENU))|COMP[.\s]*GEOGRAPHIQUE|CDR|PCTI|COMPLEMENT|IND[.\s]*RESIDENCE|SUJETION)/i;
+// à ignorer côté paie (se neutralisent / totaux)
+const SKIP_RE = /RETENU\s*CP|MAINTENU\s*CP|NET\s*HEURES\s*SUP/i;
+
+/* ============ parseur : lignes -> données brutes ============ */
+function parseRows(rows){
+  const R = {ident:{}, fixeGross:0, variables:{}, netVerse:NaN, netHS:NaN, cumulHS:NaN, hsHours:0, cotis:NaN, rawEarnings:[]};
+
+  // coupe : tout ce qui précède la 1re ligne de cotisations = rubriques de paie
+  const cotIdx = rows.findIndex(r=>/COTISATIONS ET CONTRIBUTIONS/i.test(r));
+  const payRows = cotIdx>0 ? rows.slice(0,cotIdx) : rows;
+
+  // ---- identité ----
+  const all = rows.join(' \n ');
+  const mMois = all.match(/MOIS\s*DE\s*([A-ZÉÛ]+)\s*(\d{4})/i);
+  if(mMois) R.ident.mois = cap(mMois[1]) + ' ' + mMois[2];
+  const mFonc = all.match(/FONCTION\s*:?\s*([A-ZÉÈ .'-]+?)(?:\s{2,}|AFFECTATION|CLASSE|II-|\n)/i);
+  if(mFonc) R.ident.fonction = cap(mFonc[1].trim());
+  const mGrade = all.match(/GRADE\s*:\s*([A-Z0-9]+)/i);
+  if(mGrade) R.ident.grade = mGrade[1];
+  const mAnc = all.match(/REMU\s*(\d+)A\s*(\d+)M\s*(\d+)J/i);
+  if(mAnc) R.ident.anc = `${mAnc[1]} ans ${mAnc[2]} mois`;
+  const mCls = all.match(/\b([IVX]+-\d)\b/);
+  if(mCls) R.ident.classe = mCls[1];
+  const mCoef = all.match(/COEFF\s*:?\s*([\d\s]*,\d+)/i);
+  if(mCoef) R.ident.coeff = mCoef[1].trim();
+  const mAff = all.match(/AFFECTATION\s*:?\s*([A-ZÉÈ0-9 .'-]+?)(?:\s{2,}|COEFF|CLASSE|\n)/i);
+  if(mAff) R.ident.affect = cap(mAff[1].trim());
+  const mHeu = all.match(/REFERENCES\s*:?\s*([\d\s]*,\d+)\s*HEURES/i);
+  if(mHeu) R.ident.heures = mHeu[1].replace(/\s/g,'') + ' h';
+
+  // ---- rubriques de paie ----
+  payRows.forEach(line=>{
+    if(SKIP_RE.test(line)) return;
+    const amts = amounts2(line);
+    if(!amts.length) return;
+    // ligne d'entête / totaux à écarter
+    if(/RUBRIQUES|MONTANTS|A PAYER|A DEDUIRE|PART PATRONALE|NOMBRE/i.test(line)) return;
+
+    let matched=false;
+    for(const rule of VAR_RULES){
+      if(rule.re.test(line)){
+        const val = amts[amts.length-1];            // à-payer = dernier montant à 2 déc.
+        R.variables[rule.cat] = R.variables[rule.cat] || {label:rule.label, gross:0};
+        R.variables[rule.cat].gross += val;
+        if(rule.cat==='hs') R.hsHours += amts[0];   // 1er montant = nb d'heures
+        R.rawEarnings.push({line, val, cat:rule.cat});
+        matched=true; break;
+      }
+    }
+    if(matched) return;
+    if(FIXE_RE.test(line)){
+      const val = amts[amts.length-1];
+      R.fixeGross += val;
+      R.rawEarnings.push({line, val, cat:'fixe'});
+    }
+  });
+
+  // ---- nets & cotisations ----
+  const rNet = rows.find(r=>/MONTANT NET A PAYER/i.test(r)) || rows.find(r=>/NET A PAYER/i.test(r));
+  if(rNet){ const a=amounts2(rNet); if(a.length) R.netVerse=a[a.length-1]; }
+  const rHS = rows.find(r=>/NET HEURES SUP/i.test(r));
+  if(rHS){ const a=amounts2(rHS); if(a.length>=1) R.netHS=a[0]; if(a.length>=2) R.cumulHS=a[1]; }
+  const rCot = rows.find(r=>/TOTAL COTIS[.\s]*ET CONTRIB[.\s]*OBLIG/i.test(r));
+  if(rCot){ const a=amounts2(rCot); if(a.length) R.cotis=a[0]; }  // 1er = salarial
+
+  return R;
+}
+function cap(s){ return s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); }
+
+/* ============ données brutes -> modèle du visuel (répartition en NET) ============ */
+function buildModel(R){
+  const varCats = Object.values(R.variables);
+  const hsGross = (R.variables.hs && R.variables.hs.gross) || 0;
+  const nonHsGrossVar = varCats.reduce((s,v)=>s+v.gross,0) - hsGross;
+  const brut = R.fixeGross + varCats.reduce((s,v)=>s+v.gross,0);
+  const net = R.netVerse;
+
+  // ratio net/brut sur la part NON exonérée (hors HS), ancré sur le net HS réel si dispo
+  let ratio;
+  if(!isNaN(R.netHS) && brut>hsGross){
+    ratio = (net - R.netHS) / (brut - hsGross);
+  } else {
+    ratio = net / brut;
+  }
+  const netOf = g => Math.max(0, g*ratio);
+
+  const varLines = [];
+  for(const [cat,v] of Object.entries(R.variables)){
+    const netVal = cat==='hs' && !isNaN(R.netHS) ? R.netHS : netOf(v.gross);
+    varLines.push({label:v.label, net:netVal});
+  }
+  varLines.sort((a,b)=>b.net-a.net);
+  return {ident:R.ident, netVerse:net, cotis:R.cotis,
+          hsHours:R.hsHours, netHS:R.netHS, cumulHS:R.cumulHS,
+          variables:varLines};
+}
+
+/* ============ état éditable + rendu ============ */
+let MODEL=null;
+
+function fill(id,v){ const el=document.getElementById(id); if(el && v!=null && v!=='') el.value=v; }
+function num(id){ return parseFloat(document.getElementById(id).value)||0; }
+
+function loadModelIntoForm(m){
+  fill('f_mois', m.ident.mois); fill('f_fonction', m.ident.fonction); fill('f_grade', m.ident.grade);
+  fill('f_anc', m.ident.anc); fill('f_classe', m.ident.classe); fill('f_coeff', m.ident.coeff);
+  fill('f_affect', m.ident.affect); fill('f_heures', m.ident.heures);
+  if(!isNaN(m.netVerse)) fill('f_net', m.netVerse.toFixed(2));
+  if(!isNaN(m.cotis))    fill('f_cotis', m.cotis.toFixed(2));
+  if(m.hsHours) fill('f_hsh', (Math.round(m.hsHours*100)/100));
+  if(!isNaN(m.netHS))   fill('f_hsnet', m.netHS.toFixed(2));
+  if(!isNaN(m.cumulHS)) fill('f_hscum', m.cumulHS.toFixed(2));
+  const list=document.getElementById('varList'); list.innerHTML='';
+  (m.variables.length?m.variables:[{label:'',net:0}]).forEach(v=>addVarRow(v.label, v.net));
+  recompute();
+}
+function addVarRow(label='', net=0){
+  const list=document.getElementById('varList');
+  const row=document.createElement('div'); row.className='varrow';
+  row.innerHTML=`<input class="v-lab" placeholder="Libellé" value="${label||''}">
+    <input class="v-net" type="number" step="0.01" placeholder="€ nets" value="${net?Number(net).toFixed(2):''}">
+    <button class="del" title="Supprimer">×</button>`;
+  row.querySelector('.del').onclick=()=>{row.remove();recompute();};
+  row.querySelectorAll('input').forEach(i=>i.addEventListener('input',recompute));
+  list.appendChild(row);
+}
+function readForm(){
+  const vars=[...document.querySelectorAll('#varList .varrow')].map(r=>({
+    label:r.querySelector('.v-lab').value.trim(),
+    net:parseFloat(r.querySelector('.v-net').value)||0
+  })).filter(v=>v.label && v.net>0);
+  const net=num('f_net');
+  const varTotal=vars.reduce((s,v)=>s+v.net,0);
+  return {
+    ident:{mois:val('f_mois'),fonction:val('f_fonction'),grade:val('f_grade'),anc:val('f_anc'),
+           classe:val('f_classe'),coeff:val('f_coeff'),affect:val('f_affect'),heures:val('f_heures')},
+    netVerse:net, cotis:num('f_cotis'), variables:vars, varTotal,
+    base: net-varTotal, pct: net>0? Math.round(varTotal/net*100):0,
+    hsHours:val('f_hsh'), netHS:num('f_hsnet'), cumulHS:num('f_hscum')
+  };
+}
+function val(id){ return document.getElementById(id).value.trim(); }
+function recompute(){
+  const C=coherent(readForm());
+  document.getElementById('d_base').textContent=eur(C.base);
+  document.getElementById('d_var').textContent=eur(C.varTotal);
+  document.getElementById('d_pct').textContent=C.pct+' %';
+  const chk=document.getElementById('d_check');
+  if(C.base<0){ chk.textContent='Variable > net !'; chk.classList.add('warn'); }
+  else { chk.textContent='OK'; chk.classList.remove('warn'); }
+}
+
+/* ---------- arrondis cohérents : barres, total, base et net se recollent toujours ---------- */
+function coherent(d){
+  const bars = d.variables.map(v=>({label:v.label, net:Math.round(v.net)}));
+  const netVerse = Math.round(d.netVerse);
+  const varTotal = bars.reduce((s,v)=>s+v.net,0);
+  const base = netVerse - varTotal;
+  const pct = netVerse>0 ? Math.round(varTotal/netVerse*100) : 0;
+  return {bars, netVerse, varTotal, base, pct};
+}
+
+/* ---------- rendu de l'infographie (mêmes styles que le visuel validé) ---------- */
+const IC_WALLET='<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/>';
+const IC_CHART='<path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l3-4 3 2 4-6"/>';
+const IC_CHECK='<path d="M20 7L9 18l-5-5"/>';
+function renderInfographic(d){
+  const C=coherent(d);
+  const hrs = d.hsHours ? String(d.hsHours).replace('.',',') : '';
+  const maxVar=Math.max(...C.bars.map(v=>v.net),1);
+  const bars=C.bars.map(v=>`<div class="bar"><span class="nm">${esc(v.label)}</span>
+     <div class="track"><div class="fill" style="width:${Math.max(5,Math.round(v.net/maxVar*100))}%"></div></div>
+     <span class="val tnum">${eur(v.net)}</span></div>`).join('');
+  const cell=(k,v)=>v?`<div><span class="k">${k}</span><div class="v tnum">${esc(v)}</div></div>`:'';
+  const ident=[cell('Fonction',d.ident.fonction),cell('Grade',d.ident.grade),cell('Ancienneté',d.ident.anc),
+    cell('Classe / Niveau',d.ident.classe),cell('Coefficient',d.ident.coeff),cell('Affectation',d.ident.affect),
+    cell('Heures rémunérées',d.ident.heures),cell('Mois',d.ident.mois)].join('');
+  return `
+  <div class="ig-head"><img class="ig-logo" src="${LOGO_URL}" alt="CGT FAPT">
+    <div><h1>MA FICHE DE PAIE${d.ident.mois?' – '+d.ident.mois.toUpperCase():''}</h1><p>Résumé de ma rémunération</p></div></div>
+  <div class="ident">${ident}</div>
+  <div class="hero b-base"><div class="row"><div class="ic"><svg viewBox="0 0 24 24">${IC_WALLET}</svg></div>
+    <div><div class="lab">Ton salaire net de base</div><div class="sub">Rémunération fixe de base</div></div></div>
+    <div class="amount tnum"><span class="big">${eur(C.base).replace(' €','')}</span><span class="cur">€</span><span class="net">nets</span></div>
+    <div class="desc">Ce que l'employeur te verse en rémunération fixe (hors éléments variables).</div></div>
+  <div class="hero b-var"><div class="row"><div class="ic"><svg viewBox="0 0 24 24">${IC_CHART}</svg></div>
+    <div><div class="lab">Dont part variable</div><div class="sub">Heures sup, primes, nuit, congés payés…</div></div></div>
+    <div class="amount tnum"><span class="big">${eur(C.varTotal).replace(' €','')}</span><span class="cur">€</span><span class="net">nets</span></div>
+    <span class="pill tnum">${C.pct} % du salaire net total</span></div>
+  <div class="hero b-net"><div class="row"><div class="ic"><svg viewBox="0 0 24 24">${IC_CHECK}</svg></div>
+    <div><div class="lab">Ton salaire net versé</div><div class="sub">Ce que tu touches ce mois-ci</div></div></div>
+    <div class="amount tnum"><span class="big">${eur(C.netVerse).replace(' €','')}</span><span class="cur">€</span><span class="net">nets à payer</span></div></div>
+  <div class="card"><h3><span class="dot" style="background:var(--orange)"></span>Détail de ta part variable</h3>
+    ${bars}
+    <div class="total-strip"><span class="t1">Total des éléments variables</span><span class="t2 tnum">${eur(C.varTotal)} nets</span></div></div>
+  <div class="duo">
+    <div class="mini m-hs"><h4><svg viewBox="0 0 24 24" style="width:24px;height:24px;stroke:var(--hs);fill:none;stroke-width:2.2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Heures supplémentaires</h4>
+      <div class="line"><span class="ln-k">Total d'heures</span><span class="ln-v tnum">${hrs?hrs+' h':'—'}</span></div>
+      <div class="line"><span class="ln-k">Net exonéré ce mois</span><span class="ln-v tnum">${d.netHS?eur(d.netHS):'—'}</span></div>
+      <div class="line"><span class="ln-k">Cumul annuel exonéré</span><span class="ln-v tnum">${d.cumulHS?eur(d.cumulHS):'—'}</span></div>
+      <div class="ig-note">sur un plafond de 7 500 € exonérables</div></div>
+    <div class="mini m-cot"><h4><svg viewBox="0 0 24 24" style="width:24px;height:24px;stroke:var(--rouge);fill:none;stroke-width:2.2"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg>Ta protection sociale</h4>
+      <div class="big-cot tnum">${d.cotis?eur(d.cotis).replace(' €',' '):'—'}<small>€</small></div>
+      <div style="font-size:19px;font-weight:800;color:#7a4141;margin-top:3px">de cotisations salariales</div>
+      <div class="tags"><span class="tag">Protection sociale</span><span class="tag">Retraite</span><span class="tag">Chômage</span></div></div>
+  </div>
+  <div class="resume"><div class="cap">En résumé ce mois-ci</div>
+    <div class="eq tnum">
+      <div class="term"><span class="n">${eur(C.base)}</span><span class="l">Net de base</span></div><div class="op">+</div>
+      <div class="term"><span class="n" style="color:#ffb24d">${eur(C.varTotal)}</span><span class="l">Part variable</span></div><div class="op">=</div>
+      <div class="term res"><span class="n">${eur(C.netVerse)}</span><span class="l">Net versé</span></div></div>
+    <div class="foot">Tes éléments variables représentent <b>${C.pct} %</b> de ta rémunération nette totale.</div></div>`;
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------- aperçu à l'échelle ---------- */
+function fitScaler(){
+  const wrap=document.querySelector('.previewwrap'); if(!wrap) return;
+  const avail=wrap.clientWidth-36;
+  const s=Math.min(1, avail/1080);
+  const sc=document.getElementById('scaler');
+  sc.style.transform=`scale(${s})`;
+  sc.style.height=(1920*s)+'px';
+}
+window.addEventListener('resize',fitScaler);
+
+/* ============ flux ============ */
+const statusEl=document.getElementById('status');
+function setStatus(t,cls){ statusEl.textContent=t; statusEl.className='status '+(cls||''); }
+
+async function handleFile(file){
+  if(!file){return;}
+  if(file.type!=='application/pdf'){ setStatus('Fichier non PDF.','err'); return; }
+  setStatus('Lecture du bulletin…');
+  try{
+    const rows=await extractRows(file);
+    if(!rows.length){ setStatus("Aucun texte trouvé — le PDF est peut-être une image scannée.",'err'); return; }
+    const R=parseRows(rows);
+    MODEL=buildModel(R);
+    loadModelIntoForm(MODEL);
+    document.getElementById('reviewPanel').classList.remove('hidden');
+    const miss=isNaN(R.netVerse);
+    setStatus(miss? "Lecture faite — le net versé n'a pas été trouvé, complète-le à la main."
+                  : "Lecture faite. Vérifie les montants ci-dessous avant de générer.", miss?'err':'ok');
+    document.getElementById('reviewPanel').scrollIntoView({behavior:'smooth'});
+  }catch(e){ console.error(e); setStatus('Erreur de lecture du PDF : '+e.message,'err'); }
+}
+
+const drop=document.getElementById('drop'), fileInput=document.getElementById('file');
+fileInput.addEventListener('change',e=>handleFile(e.target.files[0]));
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot');}));
+drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+document.getElementById('addVar').onclick=()=>{addVarRow();};
+[...document.querySelectorAll('#reviewPanel input')].forEach(i=>i.addEventListener('input',recompute));
+document.getElementById('genBtn').onclick=()=>{
+  const d=readForm();
+  if(!(d.netVerse>0)){ setStatus('Renseigne le salaire net versé.','err'); return; }
+  if(d.base<0){ setStatus('Le total variable dépasse le net versé — corrige les montants.','err'); return; }
+  document.getElementById('stage').innerHTML=renderInfographic(d);
+  document.getElementById('outPanel').classList.remove('hidden');
+  fitScaler();
+  document.getElementById('outPanel').scrollIntoView({behavior:'smooth'});
+};
+document.getElementById('reGen').onclick=()=>document.getElementById('reviewPanel').scrollIntoView({behavior:'smooth'});
+document.getElementById('dlBtn').onclick=async()=>{
+  const stage=document.getElementById('stage');
+  const canvas=await html2canvas(stage,{width:1080,height:1920,scale:2,backgroundColor:'#ffffff',useCORS:true});
+  const a=document.createElement('a');
+  const mois=(readForm().ident.mois||'fiche-paie').replace(/\s+/g,'-').toLowerCase();
+  a.download=`fiche-paie-${mois}.png`; a.href=canvas.toDataURL('image/png'); a.click();
+};
+
+/* expose pour tests hors-navigateur PDF */
+window.__parseRows=parseRows; window.__buildModel=buildModel;
+window.__render=(d)=>{document.getElementById('stage').innerHTML=renderInfographic(d);
+  document.getElementById('outPanel').classList.remove('hidden');fitScaler();};
+window.__loadForm=loadModelIntoForm; window.__readForm=readForm;
+</script>
+</body>
+</html>
